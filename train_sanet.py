@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
-from TSSTANet.tsstanet import stanet_af
+from TSSTANet.tsstanet import stanet
 import torch.optim as optim
 import torch.utils.data
 from dataloader.main_dataloader import MainDataset as Dataset
@@ -33,7 +33,7 @@ frame_len = 64
 features = 16
 sigma = 1
 
-Net = stanet_af(layers=[2, 2, 2, 2], in_channels=3, num_classes=1, k=2, features=features)
+Net = stanet(layers=[2, 2, 2, 2], in_channels=3, num_classes=1, k=2, features=features)
 Net = Net.to(DEVICE)
 
 optimizer = getattr(optim, optimizer_name)(Net.parameters(), lr=lr)
@@ -75,27 +75,21 @@ for epoch in range(EPOCHS):
         predict = Net(train_img.to(DEVICE))
         predict = predict * SCORE_RANGE
         predict = predict.view(predict.size(0))
-
         train_label = train_label + np.random.normal(0, sigma, train_label.shape[0])
         train_label = train_label.float().to(DEVICE)
-
         loss = MSE_loss_func(predict, train_label)
-
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
         RMSE_loss.append(MSE_loss_func(predict, train_label).item())
         MAE_loss.append(MAE_loss_func(predict, train_label).item())
         mean_mae_loss = np.mean(MAE_loss)
         mean_rmse_loss = np.sqrt(np.mean(RMSE_loss))
-
         if (step + 1) % LOG_STEP == 0:
             print('Epoch: {:d}  Step: {:d} / {:d} | train MAE: {:.4f} | train RMSE: {:.4f} | LR: {:.6f}'.format(
                 epoch, step + 1, total_step, mean_mae_loss, mean_rmse_loss, optimizer.param_groups[0]['lr']))
 
     scheduler.step()
-
     Net.eval()
     RMSE_loss = []
     MAE_loss = []
@@ -122,10 +116,10 @@ for epoch in range(EPOCHS):
     timestamp = time.strftime('%Y-%m-%d-%H_%M_%S', time.localtime(time.time()))
     print('{} val MAE: {:.4f}    val RMSE: {:.4f}'.format(timestamp, mean_mae_loss, mean_rmse_loss))
 
-    with open('training_log.csv', 'a') as f:
+    with open('training_log_stanet.csv', 'a') as f:
         f.write(f'{epoch},{mean_mae_loss},{mean_rmse_loss}\n')
 
     if mean_mae_loss < best_MAE:
         best_MAE = mean_mae_loss
-        torch.save(Net.state_dict(), './model/param_train_stanet_af.pth')
+        torch.save(Net.state_dict(), './model/best_stanet.pth')
         print('Best MAE: {:.4f}, model saved!'.format(best_MAE))
